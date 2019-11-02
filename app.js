@@ -1,17 +1,31 @@
 const mongoose = require("mongoose");
 const express = require("express");
 const bodyParser = require("body-parser");
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const app = express();
 
 //
+app.use(cors())
 app.use(bodyParser.urlencoded({
     extended: true
 }));
+
+app.all('/*', function (req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "X-Requested-With");
+    next();
+});
 
 // Crea una nueva base datos o si existe, se translada a ella
 mongoose.connect("mongodb://localhost:27017/BarrioAbajo", {
     useNewUrlParser: true,
     useUnifiedTopology: true
+});
+
+const commentSchema = new mongoose.Schema({
+    AutorName: String,
+    description: String
 });
 
 const eventSchema = new mongoose.Schema({
@@ -20,6 +34,7 @@ const eventSchema = new mongoose.Schema({
     images: String,
     date: String,
     place: String,
+    comment: [commentSchema]
 });
 
 const registerSchema = new mongoose.Schema({
@@ -32,7 +47,8 @@ const registerSchema = new mongoose.Schema({
     bankInfo: String,
     institution: String,
     genre: String
-})
+});
+const Comment = mongoose.model("Comment", commentSchema)
 const Register = mongoose.model("Register", registerSchema);
 const Event = mongoose.model("Event", eventSchema);
 
@@ -61,11 +77,21 @@ app.route("/register")
                         if (err) {
                             throw err
                         } else {
-                            res.send("Registro exitoso")
+                            const token = jwt.sign({
+                                newRegister
+                            }, "TopSecret");
+                            res.json({
+                                success: true,
+                                message: "registro exitoso",
+                                token
+                            })
                         }
                     })
                 } else {
-                    res.send("Usuario registrado previamente")
+                    res.json({
+                        success: false,
+                        message: "Usuario registrado previamente"
+                    })
                 }
             }
         })
@@ -84,13 +110,30 @@ app.route("/login")
             if (err) {
                 console.log(err);
             } else {
-                if (req.body.password == result.password) {
-                    res.send(true)
+                if (result.length != 0) {
+                    if (req.body.password == result.password) {
+                        const token = jwt.sign({
+                            result
+                        }, "TopSecret");
+                        res.json({
+                            success: true,
+                            message: "Login exitoso",
+                            token
+                        })
+                    } else {
+                        res.json({
+                            success: false,
+                            message: "Contraseña inválida"
+                        })
+                    }
                 } else {
-                    res.send(false)
-                }
-            }
-        })
+                    res.json({
+                        success: false,
+                        message: "Usuario no encontrado"
+                    })
+                };
+            };
+        });
     });
 
 // --------------------------Event------------------------
@@ -100,12 +143,11 @@ app.route("/event")
             if (err) {
                 throw err
             } else {
-                res.send(results)
+                res.json(results)
             }
         })
     })
-
-    .post(function (req, res) {
+    .post(ensureToken, function (req, res) {
         const newEvent = new Event({
             title: req.body.title,
             description: req.body.description,
@@ -117,7 +159,10 @@ app.route("/event")
             if (err) {
                 console.log(err);
             } else {
-                res.send("Successfully added to DB event");
+                res.json({
+                    success: true,
+                    message: "Successfully added to DB event"
+                });
             }
         })
     });
@@ -131,11 +176,57 @@ app.route("/event/:Eventname")
             if (err) {
                 throw err
             } else {
-                res.send(result)
+                res.json({
+                    success: true,
+                    result
+                });
             }
         })
+    })
+    .post(ensureToken, function (req, res) {
+        const userName = req.headers['username'];
+        const description = req.body.description;
+        const newcomment = new Comment({
+            AutorName: userName,
+            description: description
+        })
+        Event.findOne({
+            title: req.params.Eventname
+        }, function (err, result) {
+            if (err) {
+                throw err
+            } else {
+                result.comment.push(newcomment)
+                result.save();
+                res.json({
+                    success: true,
+                    result: "Se agregó a la base de datos"
+                })
+            }
+        });
     });
-
+// --------------------Middelware----------
+function ensureToken(req, res, next) {
+    const token = req.body.token || req.query.token || req.headers['x-access-token'];
+    if (token) {
+        jwt.verify(token, "TopSecret", function (err, decoded) {
+            if (err) {
+                return res.json({
+                    success: false,
+                    message: "Autentificación fallida"
+                });
+            } else {
+                req.decoded = decoded;
+                next();
+            }
+        })
+    } else {
+        return res.status(403).send({
+            success: false,
+            message: "No existe el token"
+        });
+    }
+}
 
 app.listen(3000, function () {
     console.log("Server started on port 3000");
