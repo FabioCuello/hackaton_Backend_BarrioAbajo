@@ -1,12 +1,20 @@
 const mongoose = require("mongoose");
 const express = require("express");
+var cors = require('cors');
 const bodyParser = require("body-parser");
 const app = express();
+app.use(cors());
 
 //
 app.use(bodyParser.urlencoded({
     extended: true
 }));
+
+app.all('/*', function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "X-Requested-With");
+    next();
+  });
 
 // Crea una nueva base datos o si existe, se translada a ella
 mongoose.connect("mongodb://localhost:27017/BarrioAbajo", {
@@ -39,7 +47,9 @@ const Event = mongoose.model("Event", eventSchema);
 // --------------------------register------------------
 
 app.route("/register")
+
     .post(function (req, res) {
+        console.log("fazd")
         Register.find({
             email: req.body.email
         }, function (err, result) {
@@ -137,6 +147,6 @@ app.route("/event/:Eventname")
     });
 
 
-app.listen(3000, function () {
+app.listen(3001, function () {
     console.log("Server started on port 3000");
 });
