@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 const express = require("express");
 var cors = require('cors');
 const bodyParser = require("body-parser");
-const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const app = express();
 app.use(cors());
@@ -12,10 +11,11 @@ app.use(cors())
 app.use(bodyParser.urlencoded({
     extended: true
 }));
+app.use(bodyParser.json())
 
 app.all('/*', function (req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "X-Requested-With");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     next();
 });
 
@@ -59,16 +59,17 @@ const Event = mongoose.model("Event", eventSchema);
 // --------------------------register------------------
 
 app.route("/register")
-
     .post(function (req, res) {
-        console.log("fazd")
+        console.log(req.body)
         Register.find({
             email: req.body.email
         }, function (err, result) {
             if (err) {
                 throw err
             } else {
+                
                 if (result.length == 0) {
+                    
                     const newRegister = new Register({
                         name: req.body.name,
                         email: req.body.email,
@@ -110,13 +111,14 @@ app.route("/register")
 
 app.route("/login")
     .post(function (req, res) {
+        console.log(req.body)
         Register.findOne({
             email: req.body.email
         }, function (err, result) {
             if (err) {
                 console.log(err);
             } else {
-                if (result.length != 0) {
+                if (result != null) {
                     if (req.body.password == result.password) {
                         const token = jwt.sign({
                             result
@@ -210,6 +212,18 @@ app.route("/event/:Eventname")
                 })
             }
         });
+    });
+app.get('/evento',function(req,res){
+    console.log('funciona');
+    const  props = {
+        img: "fsafsf",
+        review:"sfsfs",
+        author:"sfsafd",
+        rating: 3,
+        date: new Date(),
+        place: "sfsaf"
+    };
+    res.json(props);
     });
 // --------------------Middelware----------
 function ensureToken(req, res, next) {
